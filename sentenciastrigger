@@ -1,0 +1,63 @@
+--TRIGGER--
+--Impida que un estudiante se matricule en más de 10 clases.
+create or replace function prohibicion()
+returns trigger as $prohibicion$
+	declare
+	totalclases int;	
+begin
+	select count (*) into totalclases from matricula where cod_estudiante=new.COD_ESTUDIANTE;
+	if (totalclases = 10) then
+		raise exception 'No se puede matricular un estudiante en más de 10 clases';
+	end if;
+	return new;
+end;
+$prohibicion$	
+language plpgsql;
+
+create trigger ImpedirMatricula before insert
+on matricula for each row
+execute procedure prohibicion();
+
+INSERT INTO MATRICULA VALUES(351, 01, 01, 11);
+
+select * from matricula where cod_estudiante =01
+
+--CURSOR--
+--Que muestre de cada materia por periodo los estudiantes con promedios sobresalientes (igual o mayor a 19).
+do $$
+declare
+	tabla record;
+	listacalif cursor for select * from calificacion as c1		
+		inner join clase as r1 on c1.cod_clase = r1.cod_clase
+		inner join materia as r2 on r1.cod_materia = r2.cod_materia
+		inner join estudiante as r3 on c1.cod_estudiante = r3.cod_estudiante
+		inner join periodo as r4 on r1.cod_periodo = r4.cod_periodo	
+		inner join curso as r5 on r1.cod_curso = r5.cod_curso	
+		where ((c1.nota_primerparcial)+(c1.nota_segundoparcial)) >= 19
+		order by r4.periodo, r5.cod_curso, r2.cod_materia asc;
+begin
+for tabla in listacalif loop
+Raise notice 'Periodo: % - Curso: % - Materia: % - Estudiante: % - Calificaciones: % %', 
+tabla.periodo, tabla.nombre_curso, tabla.nombre_materia, tabla.nombre_estudiante, tabla.nota_primerparcial, tabla.nota_segundoparcial;
+end loop;
+end $$
+language 'plpgsql';
+
+--STORED PROCEDURE--
+--Que reciba como parámetro el código de una clase y muestre el docente que la imparte con su correo de contacto.
+create or replace function clase_docente(integer)
+returns varchar
+as $$
+	declare
+	clase alias for $1;
+	docente varchar(100);
+begin
+	select concat(docente.nombre_docente ||' - '||docente.correo_docente) as infodocente
+	into docente from docente inner join clase on clase.cod_docente = docente.cod_docente
+	where clase.cod_clase = $1;
+	return docente;
+end;
+$$
+language plpgsql;
+	
+select clase_docente('03')
